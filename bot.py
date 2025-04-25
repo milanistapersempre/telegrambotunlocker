@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -22,7 +23,7 @@ if not TOKEN:
 REQUIRED_CHANNELS = [
     {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
 ]  # Sostituisci con i tuoi canali
-CONTENT = os.getenv("REWARD_LINK", "Link sbloccato: https://t.me/+Jqgbw-dewP04MTE0")
+CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+Jqgbw-dewP04MTE0")
 
 # Crea l'applicazione Telegram
 try:
@@ -77,10 +78,13 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 def webhook():
     try:
         logger.info("Ricevuta richiesta POST al webhook")
-        update = Update.de_json(request.get_json(), application.bot)
+        update_data = request.get_json()
+        logger.info(f"Dati ricevuti: {update_data}")
+        update = Update.de_json(update_data, application.bot)
         if update:
             logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}, tipo={update.to_dict()}")
-            application.process_update(update)
+            # Esegui process_update in modo asincrono
+            asyncio.run(application.process_update(update))
         else:
             logger.warning("Nessun aggiornamento valido ricevuto")
         return "OK"
@@ -98,7 +102,7 @@ def health():
 try:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(check_subscription, pattern="check"))
-    logger.info("Handler registrati correttamente")
+    logger.info("Handler registrati correttamente: /start, check_subscription")
 except Exception as e:
     logger.error(f"Errore durante la registrazione degli handler: {e}")
     raise
