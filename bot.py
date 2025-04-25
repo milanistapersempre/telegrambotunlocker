@@ -22,9 +22,8 @@ if not TOKEN:
     raise ValueError("TELEGRAM_TOKEN non trovato")
 REQUIRED_CHANNELS = [
     {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
-    {"tag": "@IlTuoCanale2", "name": "Canale Offerte"}
 ]  # Sostituisci con i tuoi canali
-CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+Jqgbw-dewP04MTE0")
+CONTENT = os.getenv("REWARD_LINK", "Link sbloccato: https://t.me/+Jqgbw-dewP04MTE0t")
 
 # Crea e inizializza l'applicazione Telegram
 application = None
@@ -32,11 +31,13 @@ application = None
 async def init_application():
     global application
     try:
+        logger.info("Inizio inizializzazione Application con token")
         application = Application.builder().token(TOKEN).build()
+        logger.info("Application creata correttamente")
         await application.initialize()
-        logger.info("Applicazione Telegram inizializzata correttamente")
+        logger.info("Application inizializzata correttamente")
     except Exception as e:
-        logger.error(f"Errore durante l'inizializzazione dell'applicazione: {e}")
+        logger.error(f"Errore durante l'inizializzazione dell'Application: {e}")
         raise
 
 # Handler per il comando /start
@@ -86,6 +87,9 @@ async def webhook():
         logger.info("Ricevuta richiesta POST al webhook")
         update_data = request.get_json()
         logger.info(f"Dati ricevuti: {update_data}")
+        if application is None:
+            logger.error("Application non inizializzata nel webhook")
+            return "Errore: Application non inizializzata", 500
         update = Update.de_json(update_data, application.bot)
         if update:
             logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}, tipo={update.to_dict()}")
@@ -105,16 +109,18 @@ def health():
 
 # Inizializza il bot
 try:
+    logger.info("Registrazione degli handler")
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(init_application())
+    if application is None:
+        logger.error("Application è None dopo inizializzazione")
+        raise ValueError("Application non inizializzata")
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(check_subscription, pattern="check"))
     logger.info("Handler registrati correttamente: /start, check_subscription")
 except Exception as e:
     logger.error(f"Errore durante la registrazione degli handler: {e}")
     raise
-
-# Esegui l'inizializzazione dell'applicazione all'avvio
-loop = asyncio.get_event_loop()
-loop.run_until_complete(init_application())
 
 # Gunicorn avvia il server
 if __name__ == "__main__":
