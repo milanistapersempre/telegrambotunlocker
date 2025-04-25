@@ -50,9 +50,9 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # Endpoint Flask per il webhook
 @app_flask.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
+def webhook():
     update = Update.de_json(request.get_json(), application.bot)
-    await application.process_update(update)
+    application.process_update(update)
     return "OK"
 
 # Endpoint di salute
