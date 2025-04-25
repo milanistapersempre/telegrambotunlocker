@@ -22,16 +22,22 @@ if not TOKEN:
     raise ValueError("TELEGRAM_TOKEN non trovato")
 REQUIRED_CHANNELS = [
     {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
+    {"tag": "@IlTuoCanale2", "name": "Canale Offerte"}
 ]  # Sostituisci con i tuoi canali
 CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+Jqgbw-dewP04MTE0")
 
-# Crea l'applicazione Telegram
-try:
-    application = Application.builder().token(TOKEN).build()
-    logger.info("Applicazione Telegram inizializzata correttamente")
-except Exception as e:
-    logger.error(f"Errore durante l'inizializzazione dell'applicazione: {e}")
-    raise
+# Crea e inizializza l'applicazione Telegram
+application = None
+
+async def init_application():
+    global application
+    try:
+        application = Application.builder().token(TOKEN).build()
+        await application.initialize()
+        logger.info("Applicazione Telegram inizializzata correttamente")
+    except Exception as e:
+        logger.error(f"Errore durante l'inizializzazione dell'applicazione: {e}")
+        raise
 
 # Handler per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -75,7 +81,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # Endpoint Flask per il webhook
 @app_flask.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
+async def webhook():
     try:
         logger.info("Ricevuta richiesta POST al webhook")
         update_data = request.get_json()
@@ -83,8 +89,7 @@ def webhook():
         update = Update.de_json(update_data, application.bot)
         if update:
             logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}, tipo={update.to_dict()}")
-            # Esegui process_update in modo asincrono
-            asyncio.run(application.process_update(update))
+            await application.process_update(update)
         else:
             logger.warning("Nessun aggiornamento valido ricevuto")
         return "OK"
@@ -106,6 +111,10 @@ try:
 except Exception as e:
     logger.error(f"Errore durante la registrazione degli handler: {e}")
     raise
+
+# Esegui l'inizializzazione dell'applicazione all'avvio
+loop = asyncio.get_event_loop()
+loop.run_until_complete(init_application())
 
 # Gunicorn avvia il server
 if __name__ == "__main__":
