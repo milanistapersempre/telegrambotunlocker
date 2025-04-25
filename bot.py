@@ -8,11 +8,10 @@ app_flask = Flask(__name__)
 
 # Configura il token e altre variabili
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-# Lista di dizionari con tag e nome personalizzato per ogni canale
 REQUIRED_CHANNELS = [
-    {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"}, 
-]  
-CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+Jqgbw-dewP04MTE0")
+    {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},    
+]  # Sostituisci con i tuoi canali
+CONTENT = os.getenv("REWARD_LINK", "Link sbloccato: https://t.me/+Jqgbw-dewP04MTE0")
 
 # Crea l'applicazione Telegram
 application = Application.builder().token(TOKEN).build()
@@ -24,7 +23,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for channel in REQUIRED_CHANNELS
     ]
     keyboard.append([InlineKeyboardButton("Verifica", callback_data="check")])
-    await update.message.reply_text("Iscriviti ai canali per sbloccare il link:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text("Ciao, iscriviti ai seguenti canali per sbloccare il link:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 # Handler per la verifica dell'iscrizione
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,16 +55,15 @@ async def webhook():
     await application.process_update(update)
     return "OK"
 
-# Endpoint di salute (per verificare che il servizio sia attivo)
+# Endpoint di salute
 @app_flask.route("/")
 def health():
     return "Bot is running"
 
-# Inizializza il bot e avvia Flask
+# Inizializza il bot
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CallbackQueryHandler(check_subscription, pattern="check"))
+
+# Gunicorn avvia il server, non Flask
 if __name__ == "__main__":
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(check_subscription, pattern="check"))
-    
-    # Usa la porta fornita da Render tramite la variabile PORT
-    port = int(os.getenv("PORT", 8080))
-    app_flask.run(host="0.0.0.0", port=port)
+    print("Bot initialized. Server should be started by Gunicorn in production.")
