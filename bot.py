@@ -2,7 +2,7 @@ import os
 import logging
 import asyncio
 from flask import Flask, request
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Configura il logging
@@ -21,7 +21,8 @@ if not TOKEN:
     logger.error("TELEGRAM_TOKEN non trovato nelle variabili d'ambiente")
     raise ValueError("TELEGRAM_TOKEN non trovato")
 REQUIRED_CHANNELS = [
-    {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
+    {"tag": "@milanorossonerareplay", "name": "Canale 1"},
+    # Aggiungi altri canali se necessario
 ]
 CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+RFashWjj1q9mMTFk")
 
@@ -59,7 +60,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         message,
         reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode="Markdown"
     )
 
 # Handler per la verifica dell'iscrizione
