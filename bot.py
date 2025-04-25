@@ -2,7 +2,7 @@ import os
 import logging
 import asyncio
 from flask import Flask, request
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Configura il logging
@@ -22,18 +22,15 @@ if not TOKEN:
     raise ValueError("TELEGRAM_TOKEN non trovato")
 REQUIRED_CHANNELS = [
     {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
-]  # Sostituisci con i tuoi canali
-CONTENT = os.getenv("REWARD_LINK", "Link sbloccato: https://t.me/+Jqgbw-dewP04MTE0t")
+]
+CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+RFashWjj1q9mMTFk")
 
-# Crea e inizializza l'applicazione Telegram
-application = None
+# Crea l'applicazione Telegram
+application = Application.builder().token(TOKEN).build()
 
+# Inizializza l'applicazione
 async def init_application():
-    global application
     try:
-        logger.info("Inizio inizializzazione Application con token")
-        application = Application.builder().token(TOKEN).build()
-        logger.info("Application creata correttamente")
         await application.initialize()
         logger.info("Application inizializzata correttamente")
     except Exception as e:
@@ -49,11 +46,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for channel in REQUIRED_CHANNELS
     ]
     keyboard.append([InlineKeyboardButton("Verifica", callback_data="check")])
+    
+    # Messaggio formattato con Markdown
     message = (
-        f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link. "
-        "(Il link potrebbe arrivare con un attimo di ritardo.)"
+        f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link.\n"
+        "__Il link potrebbe arrivare con un ritardo di circa 1 minuto.__\n"
+        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscrivervi, "
+        "oppure se la verifica dell'iscrizione non viene effettuata correttamente, riprovate scrivendo /start. "
+        "Se continua a laggare, aspettate qualche secondo e riprovate.*"
     )
-    await update.message.reply_text(message, reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    await update.message.reply_text(
+        message,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN
+    )
 
 # Handler per la verifica dell'iscrizione
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -82,18 +89,17 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # Endpoint Flask per il webhook
 @app_flask.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
+def webhook():
     try:
         logger.info("Ricevuta richiesta POST al webhook")
         update_data = request.get_json()
         logger.info(f"Dati ricevuti: {update_data}")
-        if application is None:
-            logger.error("Application non inizializzata nel webhook")
-            return "Errore: Application non inizializzata", 500
         update = Update.de_json(update_data, application.bot)
         if update:
-            logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}, tipo={update.to_dict()}")
-            await application.process_update(update)
+            logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}")
+            # Usa run_coroutine_threadsafe per eseguire process_update
+            loop = asyncio.get_running_loop()
+            asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
         else:
             logger.warning("Nessun aggiornamento valido ricevuto")
         return "OK"
@@ -107,14 +113,12 @@ def health():
     logger.info("Richiesta endpoint di salute")
     return "Bot is running"
 
-# Inizializza il bot
+# Inizializza l'applicazione
+loop = asyncio.get_event_loop()
+loop.run_until_complete(init_application())
+
+# Registra gli handler
 try:
-    logger.info("Registrazione degli handler")
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(init_application())
-    if application is None:
-        logger.error("Application è None dopo inizializzazione")
-        raise ValueError("Application non inizializzata")
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(check_subscription, pattern="check"))
     logger.info("Handler registrati correttamente: /start, check_subscription")
