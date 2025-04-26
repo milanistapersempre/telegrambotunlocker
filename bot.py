@@ -95,11 +95,13 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     for channel in REQUIRED_CHANNELS:
         try:
+            logger.info(f"Verifica iscrizione per user_id: {user_id} al canale: {channel['tag']}")
             # Esegui get_chat_member con timeout
             member = await asyncio.wait_for(
                 context.bot.get_chat_member(chat_id=channel["tag"], user_id=user_id),
                 timeout=5
             )
+            logger.info(f"Stato iscrizione per {channel['tag']}: {member.status}")
             if member.status not in ["member", "administrator", "creator"]:
                 missing.append(channel)
         except asyncio.TimeoutError:
@@ -112,6 +114,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not missing:
         try:
             await query.message.edit_text(CONTENT)
+            logger.info(f"Contenuto sbloccato per user_id: {user_id}")
         except BadRequest as e:
             if "Message is not modified" in str(e):
                 logger.info("Messaggio non modificato, contenuto già corretto")
@@ -130,6 +133,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
         try:
             if query.message.text != new_text or query.message.reply_markup != InlineKeyboardMarkup(keyboard):
                 await query.message.edit_text(new_text, reply_markup=InlineKeyboardMarkup(keyboard))
+                logger.info(f"Messaggio aggiornato per user_id: {user_id}: {new_text}")
             else:
                 logger.info("Messaggio non modificato, stesso contenuto e markup")
         except BadRequest as e:
