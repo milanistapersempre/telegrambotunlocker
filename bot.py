@@ -46,7 +46,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update and update.effective_message:
         try:
             await update.effective_message.reply_text(
-                "Si è verificato un errore durante la verifica. Riprova con /start o attendi qualche secondo."
+                "Errore nella verifica dell'iscrizione. Assicurati di essere iscritto al canale e riprova con /start o 'Riprova'."
             )
         except Exception as e:
             logger.error(f"Errore nell'invio del messaggio di errore: {e}")
@@ -65,7 +65,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link.\n"
         "__Il link potrebbe arrivare con un ritardo di circa 1 minuto.__\n"
-        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscrivervi, "
+        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscriverti, "
         "oppure se la verifica dell'iscrizione non viene effettuata correttamente, riprovate scrivendo /start. "
         "Se continua a laggare, aspettate qualche secondo e riprovate.*"
     )
@@ -94,22 +94,27 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     missing = []
     
     for channel in REQUIRED_CHANNELS:
-        try:
-            logger.info(f"Verifica iscrizione per user_id: {user_id} al canale: {channel['tag']}")
-            # Esegui get_chat_member con timeout
-            member = await asyncio.wait_for(
-                context.bot.get_chat_member(chat_id=channel["tag"], user_id=user_id),
-                timeout=5
-            )
-            logger.info(f"Stato iscrizione per {channel['tag']}: {member.status}")
-            if member.status not in ["member", "administrator", "creator"]:
-                missing.append(channel)
-        except asyncio.TimeoutError:
-            logger.error(f"Timeout durante la verifica del canale {channel['tag']}")
-            missing.append(channel)
-        except Exception as e:
-            logger.error(f"Errore durante la verifica del canale {channel['tag']}: {e}")
-            missing.append(channel)
+        for attempt in range(3):  # Retry per get_chat_member
+            try:
+                logger.info(f"Verifica iscrizione per user_id: {user_id} al canale: {channel['tag']}, tentativo {attempt + 1}")
+                # Esegui get_chat_member con timeout
+                member = await asyncio.wait_for(
+                    context.bot.get_chat_member(chat_id=channel["tag"], user_id=user_id),
+                    timeout=5
+                )
+                logger.info(f"Stato iscrizione per {channel['tag']}: {member.status}")
+                if member.status not in ["member", "administrator", "creator"]:
+                    missing.append(channel)
+                break  # Esci dal ciclo di retry se la chiamata ha successo
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout durante la verifica del canale {channel['tag']}, tentativo {attempt + 1}")
+                if attempt == 2:
+                    missing.append(channel)
+            except Exception as e:
+                logger.error(f"Errore durante la verifica del canale {channel['tag']}, tentativo {attempt + 1}: {e}")
+                if attempt == 2:
+                    missing.append(channel)
+                await asyncio.sleep(1)  # Attendi 1 secondo prima di riprovare
     
     if not missing:
         try:
@@ -144,7 +149,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # Endpoint Flask per il webhook
 @app_flask.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
+def webhook():
     try:
         logger.info("Ricevuta richiesta POST al webhook")
         update_data = request.get_json()
@@ -152,8 +157,16 @@ async def webhook():
         update = Update.de_json(update_data, application.bot)
         if update:
             logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}")
-            # Esegui process_update con timeout
-            await asyncio.wait_for(application.process_update(update), timeout=10)
+            # Crea un nuovo event loop per questa richiesta
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                # Esegui process_update con timeout
+                loop.run_until_complete(
+                    asyncio.wait_for(application.process_update(update), timeout=10)
+                )
+            finally:
+                loop.close()
         else:
             logger.warning("Nessun aggiornamento valido ricevuto")
         return "OK"
