@@ -38,6 +38,14 @@ async def init_application():
         logger.error(f"Errore durante l'inizializzazione dell'Application: {e}")
         raise
 
+# Handler per gli errori
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.error(f"Errore durante l'elaborazione dell'aggiornamento {update}: {context.error}")
+    if update and update.effective_message:
+        await update.effective_message.reply_text(
+            "Si è verificato un errore. Riprova con /start o attendi qualche secondo."
+        )
+
 # Handler per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
@@ -51,8 +59,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Messaggio formattato con Markdown
     message = (
         f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link.\n"
-        "__Il link potrebbe arrivare con un ritardo di circa 1 minuto.__\n"
-        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscriverti, "
+        "__Il link potrebbe arrivare con un attimo di ritardo.__\n"
+        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscrivervi, "
         "oppure se la verifica dell'iscrizione non viene effettuata correttamente, riprovate scrivendo /start. "
         "Se continua a laggare, aspettate qualche secondo e riprovate.*"
     )
@@ -113,15 +121,21 @@ def health():
     logger.info("Richiesta endpoint di salute")
     return "Bot is running"
 
-# Inizializza l'applicazione
-loop = asyncio.get_event_loop()
-loop.run_until_complete(init_application())
+# Inizializza l'applicazione con un event loop dedicato
+try:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(init_application())
+except Exception as e:
+    logger.error(f"Errore durante l'inizializzazione dell'Application: {e}")
+    raise
 
 # Registra gli handler
 try:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(check_subscription, pattern="check"))
-    logger.info("Handler registrati correttamente: /start, check_subscription")
+    application.add_error_handler(error_handler)
+    logger.info("Handler registrati correttamente: /start, check_subscription, error_handler")
 except Exception as e:
     logger.error(f"Errore durante la registrazione degli handler: {e}")
     raise
