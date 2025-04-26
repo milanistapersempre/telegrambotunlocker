@@ -1,9 +1,11 @@
 import os
 import logging
 import asyncio
+import httpx
 from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.error import NetworkError, TimedOut, BadRequest
 
 # Configura il logging
 logging.basicConfig(
@@ -21,13 +23,13 @@ if not TOKEN:
     logger.error("TELEGRAM_TOKEN non trovato nelle variabili d'ambiente")
     raise ValueError("TELEGRAM_TOKEN non trovato")
 REQUIRED_CHANNELS = [
-    {"tag": "@milanorossonerareplay", "name": "Canale 1"},
+    {"tag": "@milanorossonerareplay", "name": "Milanorossonerareplay"},
     # Aggiungi altri canali se necessario
 ]
-CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+RFashWjj1q9mMTFk")
+CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://example.com/default")
 
-# Crea l'applicazione Telegram
-application = Application.builder().token(TOKEN).build()
+# Crea l'applicazione Telegram con timeout
+application = Application.builder().token(TOKEN).http_timeout(10).build()
 
 # Inizializza l'applicazione
 async def init_application():
@@ -42,9 +44,12 @@ async def init_application():
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Errore durante l'elaborazione dell'aggiornamento {update}: {context.error}")
     if update and update.effective_message:
-        await update.effective_message.reply_text(
-            "Si è verificato un errore. Riprova con /start o attendi qualche secondo."
-        )
+        try:
+            await update.effective_message.reply_text(
+                "Si è verificato un errore durante la verifica. Riprova con /start o attendi qualche secondo."
+            )
+        except Exception as e:
+            logger.error(f"Errore nell'invio del messaggio di errore: {e}")
 
 # Handler per il comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -59,17 +64,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Messaggio formattato con Markdown
     message = (
         f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link.\n"
-        "__Il link potrebbe arrivare con un attimo di ritardo.__\n"
-        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscrivervi, "
+        "__Il link potrebbe arrivare con un ritardo di circa 1 minuto.__\n"
+        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscriverti, "
         "oppure se la verifica dell'iscrizione non viene effettuata correttamente, riprovate scrivendo /start. "
         "Se continua a laggare, aspettate qualche secondo e riprovate.*"
     )
     
-    await update.message.reply_text(
-        message,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    # Prova con retry in caso di errore di rete
+    for attempt in range(3):
+        try:
+            await update.message.reply_text(
+                message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+            break
+        except (NetworkError, TimedOut) as e:
+            logger.warning(f"Tentativo {attempt + 1} fallito: {e}")
+            if attempt < 2:
+                await asyncio.sleep(2)  # Attendi 2 secondi prima di riprovare
+            else:
+                raise
 
 # Handler per la verifica dell'iscrizione
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,16 +92,31 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     user_id = query.from_user.id
     missing = []
+    
     for channel in REQUIRED_CHANNELS:
         try:
-            member = await context.bot.get_chat_member(chat_id=channel["tag"], user_id=user_id)
+            # Esegui get_chat_member con timeout
+            member = await asyncio.wait_for(
+                context.bot.get_chat_member(chat_id=channel["tag"], user_id=user_id),
+                timeout=5
+            )
             if member.status not in ["member", "administrator", "creator"]:
                 missing.append(channel)
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout durante la verifica del canale {channel['tag']}")
+            missing.append(channel)
         except Exception as e:
             logger.error(f"Errore durante la verifica del canale {channel['tag']}: {e}")
             missing.append(channel)
+    
     if not missing:
-        await query.message.edit_text(CONTENT)
+        try:
+            await query.message.edit_text(CONTENT)
+        except BadRequest as e:
+            if "Message is not modified" in str(e):
+                logger.info("Messaggio non modificato, contenuto già corretto")
+            else:
+                raise
     else:
         keyboard = [
             [InlineKeyboardButton(channel["name"], url=f"https://t.me/{channel['tag'][1:]}")]
@@ -94,7 +124,19 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
         keyboard.append([InlineKeyboardButton("Riprova", callback_data="check")])
         missing_names = [channel["name"] for channel in missing]
-        await query.message.edit_text("Iscriviti a: " + "\n".join(missing_names), reply_markup=InlineKeyboardMarkup(keyboard))
+        new_text = "Iscriviti a: " + "\n".join(missing_names)
+        
+        # Controlla se il messaggio è cambiato prima di modificarlo
+        try:
+            if query.message.text != new_text or query.message.reply_markup != InlineKeyboardMarkup(keyboard):
+                await query.message.edit_text(new_text, reply_markup=InlineKeyboardMarkup(keyboard))
+            else:
+                logger.info("Messaggio non modificato, stesso contenuto e markup")
+        except BadRequest as e:
+            if "Message is not modified" in str(e):
+                logger.info("Messaggio non modificato, contenuto già corretto")
+            else:
+                raise
 
 # Endpoint Flask per il webhook
 @app_flask.route(f"/{TOKEN}", methods=["POST"])
@@ -106,10 +148,13 @@ async def webhook():
         update = Update.de_json(update_data, application.bot)
         if update:
             logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}")
-            # Esegui process_update in modo asincrono
-            await application.process_update(update)
+            # Esegui process_update con timeout
+            await asyncio.wait_for(application.process_update(update), timeout=10)
         else:
             logger.warning("Nessun aggiornamento valido ricevuto")
+        return "OK"
+    except asyncio.TimeoutError:
+        logger.error("Timeout durante l'elaborazione dell'aggiornamento")
         return "OK"
     except Exception as e:
         logger.error(f"Errore nel processare l'aggiornamento: {e}")
