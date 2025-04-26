@@ -23,10 +23,10 @@ if not TOKEN:
     logger.error("TELEGRAM_TOKEN non trovato nelle variabili d'ambiente")
     raise ValueError("TELEGRAM_TOKEN non trovato")
 REQUIRED_CHANNELS = [
-    {"tag": "@milanorossonerareplay", "name": "Milanorossonerareplay"},
+    {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
     # Aggiungi altri canali se necessario
 ]
-CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://example.com/default")
+CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+RFashWjj1q9mMTFk")
 
 # Crea l'applicazione Telegram con timeout
 application = Application.builder().token(TOKEN).read_timeout(10).write_timeout(10).build()
@@ -64,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Messaggio formattato con Markdown
     message = (
         f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link.\n"
-        "__Il link potrebbe arrivare con un ritardo di circa 1 minuto.__\n"
+        "__Il link potrebbe arrivare con un attimo di ritardo.__\n"
         "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscriverti, "
         "oppure se la verifica dell'iscrizione non viene effettuata correttamente, riprovate scrivendo /start. "
         "Se continua a laggare, aspettate qualche secondo e riprovate.*"
