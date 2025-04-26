@@ -52,7 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link.\n"
         "__Il link potrebbe arrivare con un ritardo di circa 1 minuto.__\n"
-        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscrivervi, "
+        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscriverti, "
         "oppure se la verifica dell'iscrizione non viene effettuata correttamente, riprovate scrivendo /start. "
         "Se continua a laggare, aspettate qualche secondo e riprovate.*"
     )
@@ -90,7 +90,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # Endpoint Flask per il webhook
 @app_flask.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
+async def webhook():
     try:
         logger.info("Ricevuta richiesta POST al webhook")
         update_data = request.get_json()
@@ -98,9 +98,8 @@ def webhook():
         update = Update.de_json(update_data, application.bot)
         if update:
             logger.info(f"Aggiornamento ricevuto: update_id={update.update_id}")
-            # Usa run_coroutine_threadsafe per eseguire process_update
-            loop = asyncio.get_running_loop()
-            asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
+            # Esegui process_update in modo asincrono
+            await application.process_update(update)
         else:
             logger.warning("Nessun aggiornamento valido ricevuto")
         return "OK"
