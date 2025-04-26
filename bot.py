@@ -29,7 +29,7 @@ REQUIRED_CHANNELS = [
 CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://example.com/default")
 
 # Crea l'applicazione Telegram con timeout
-application = Application.builder().token(TOKEN).http_timeout(10).build()
+application = Application.builder().token(TOKEN).read_timeout(10).write_timeout(10).build()
 
 # Inizializza l'applicazione
 async def init_application():
@@ -65,7 +65,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         f"Ciao {user_name}! Iscriviti ai canali qui sotto per sbloccare il link.\n"
         "__Il link potrebbe arrivare con un ritardo di circa 1 minuto.__\n"
-        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscriverti, "
+        "*Il bot a volte potrebbe laggare, quindi se non vi appare subito l'elenco dei canali a cui dovete iscrivervi, "
         "oppure se la verifica dell'iscrizione non viene effettuata correttamente, riprovate scrivendo /start. "
         "Se continua a laggare, aspettate qualche secondo e riprovate.*"
     )
