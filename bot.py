@@ -23,11 +23,10 @@ if not TOKEN:
     logger.error("TELEGRAM_TOKEN non trovato nelle variabili d'ambiente")
     raise ValueError("TELEGRAM_TOKEN non trovato")
 REQUIRED_CHANNELS = [
-    {"tag": "@JustFootball5", "name": "Just Football"},
-    {"tag": "@Canalemilan", "name": "Milano Rossonera"}
+    {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
     # Aggiungi altri canali se necessario
 ]
-CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+F9uVdlm-ClM3OTk0")
+CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+yH7pJOgvL1U5MmY0")
 
 # Crea l'applicazione Telegram con timeout
 application = Application.builder().token(TOKEN).read_timeout(10).write_timeout(10).build()
