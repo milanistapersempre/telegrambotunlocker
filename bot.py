@@ -26,7 +26,7 @@ REQUIRED_CHANNELS = [
     {"tag": "@milanorossonerareplay", "name": "Canale Replay Milan"},
     # Aggiungi altri canali se necessario
 ]
-CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+A4w83yAHKcNlMDc0")
+CONTENT = os.getenv("REWARD_LINK", "Contenuto sbloccato: https://t.me/+s9YaCPqq31cyMGM8")
 
 # Crea l'applicazione Telegram con timeout
 application = Application.builder().token(TOKEN).read_timeout(10).write_timeout(10).build()
